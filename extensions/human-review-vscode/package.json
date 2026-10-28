@@ -1,0 +1,32 @@
+{
+  "name": "human-review",
+  "displayName": "Human Review",
+  "description": "Renders the human-review skill's .review/review.json: service map, backend flow, frontend state, data models, tests, open questions, with one-click file and diff links.",
+  "publisher": "lior-lahav",
+  "version": "0.2.0",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["workspaceContains:.review/review.json"],
+  "extensionDependencies": ["vscode.git"],
+  "contributes": {
+    "commands": [
+      { "command": "humanReview.open", "title": "Human Review: Open" },
+      { "command": "humanReview.clearReviewed", "title": "Human Review: Clear reviewed marks" }
+    ]
+  },
+  "scripts": {
+    "copy-mermaid": "node scripts/copy-mermaid.js",
+    "compile": "tsc -p .",
+    "vscode:prepublish": "npm run copy-mermaid && npm run compile",
+    "package": "vsce package --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.6",
+    "@types/vscode": "1.85.0",
+    "@vscode/vsce": "3.2.1",
+    "mermaid": "11.4.1",
+    "typescript": "5.6.3"
+  }
+}

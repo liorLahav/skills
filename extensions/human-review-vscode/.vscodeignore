@@ -1,0 +1,7 @@
+src/**
+scripts/**
+sample/**
+skill/**
+node_modules/**
+tsconfig.json
+**/*.map

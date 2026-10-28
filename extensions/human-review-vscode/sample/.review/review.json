@@ -1,0 +1,451 @@
+{
+  "version": 1,
+  "title": "Ticket snooze",
+  "base": "main",
+  "baseSha": "4b1d7c0e2a9f",
+  "head": "feat/ticket-snooze",
+  "headSha": "9f3c2e1a77d0",
+  "pr": {
+    "number": 142,
+    "url": "https://github.com/acme/helpdesk/pull/142"
+  },
+  "start": {
+    "what": "Agent can snooze a ticket until a time. Hidden from inbox. Comes back by itself, live.",
+    "why": "PR #142: tickets waiting on a customer reply get lost in the inbox.",
+    "intent": {
+      "matches": false,
+      "extra": [
+        "optional note on snooze",
+        "snoozeCount column"
+      ],
+      "missing": []
+    },
+    "readFirst": [
+      {
+        "ref": {
+          "path": "apps/api/src/tickets/tickets.service.ts",
+          "startLine": 52,
+          "endLine": 60
+        },
+        "why": "wakeDue: only code that changes tickets without a user"
+      },
+      {
+        "ref": {
+          "path": "apps/api/src/tickets/tickets.repository.ts",
+          "startLine": 30,
+          "endLine": 56
+        },
+        "why": "inbox filter + due query decide what inbox shows"
+      },
+      {
+        "ref": {
+          "path": "apps/api/src/tickets/tickets.service.ts",
+          "startLine": 30,
+          "endLine": 38
+        },
+        "why": "snooze rules: 404, 409"
+      },
+      {
+        "ref": {
+          "path": "apps/web/src/app/inbox/inbox.store.ts",
+          "startLine": 6,
+          "endLine": 44
+        },
+        "why": "where tickets move between tabs"
+      }
+    ],
+    "size": {
+      "files": 20,
+      "additions": 418,
+      "deletions": 37
+    }
+  },
+  "services": [
+    {
+      "name": "api",
+      "path": "apps/api",
+      "kind": "backend",
+      "changed": "2 new routes, cron wakes tickets, 4 DB columns"
+    },
+    {
+      "name": "web",
+      "path": "apps/web",
+      "kind": "frontend",
+      "changed": "snooze menu, Snoozed tab, live wake"
+    },
+    {
+      "name": "shared-types",
+      "path": "packages/shared-types",
+      "kind": "types",
+      "changed": "Ticket snooze fields, request type, event name"
+    }
+  ],
+  "serviceMap": {
+    "mermaid": "flowchart LR\n  T[\"shared-types<br/>(types)\"]:::chg\n  API[\"api<br/>(backend)\"]:::chg\n  WEB[\"web<br/>(frontend)\"]:::chg\n  PG[(\"Postgres\")]:::same\n  RD[(\"Redis\")]:::same\n  T -->|\"types for api\"| API\n  T -->|\"types for web\"| WEB\n  WEB -->|\"calls api via HTTP\"| API\n  API -->|\"pushes ticket.woke via WS\"| WEB\n  API --> PG\n  API --> RD\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152"
+  },
+  "backend": [
+    {
+      "service": "api",
+      "flow": {
+        "mermaid": "flowchart LR\n  subgraph R[\"Routes / triggers\"]\n    P1[\"PATCH /tickets/:id/snooze\"]:::add\n    P2[\"DELETE /tickets/:id/snooze\"]:::add\n    P3[\"GET /tickets?snoozed\"]:::chg\n    CR[\"Cron every 1 min\"]:::add\n  end\n  subgraph G[\"Guards / pipes\"]\n    JG[\"JwtAuthGuard\"]:::same\n    DTO[\"SnoozeTicketDto\"]:::add\n  end\n  subgraph S[\"Services\"]\n    TS[\"TicketsService\"]:::chg\n    EG[\"EventsGateway\"]:::same\n  end\n  subgraph M[\"Repos / models\"]\n    TR[\"TicketsRepository\"]:::chg\n    TE[\"TicketEntity\"]:::chg\n  end\n  subgraph D[\"Data / outside\"]\n    DB[(\"tickets\")]:::chg\n    RC[(\"Redis inbox:tenantId\")]:::same\n    WS([\"WS ticket.woke\"]):::add\n  end\n  P1 -->|\"uses JwtAuthGuard\"| JG\n  P1 -->|\"validates SnoozeTicketDto\"| DTO\n  P1 -->|\"calls snooze\"| TS\n  P2 -->|\"calls unsnooze\"| TS\n  P3 -->|\"calls listInbox\"| TS\n  CR -->|\"calls wakeDue\"| TS\n  TS -->|\"injects TicketsRepository\"| TR\n  TS -->|\"calls toTenant\"| EG\n  TS -->|\"cache.del\"| RC\n  TR -->|\"types only: TicketEntity\"| TE\n  TE -->|\"maps to\"| DB\n  EG -->|\"emits\"| WS\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+        "nodes": {
+          "P1": {
+            "path": "apps/api/src/tickets/tickets.controller.ts",
+            "startLine": 40
+          },
+          "P2": {
+            "path": "apps/api/src/tickets/tickets.controller.ts",
+            "startLine": 50
+          },
+          "P3": {
+            "path": "apps/api/src/tickets/tickets.controller.ts",
+            "startLine": 22
+          },
+          "CR": {
+            "path": "apps/api/src/tickets/snooze.scheduler.ts"
+          },
+          "DTO": {
+            "path": "apps/api/src/tickets/dto/snooze-ticket.dto.ts"
+          },
+          "TS": {
+            "path": "apps/api/src/tickets/tickets.service.ts"
+          },
+          "TR": {
+            "path": "apps/api/src/tickets/tickets.repository.ts"
+          },
+          "TE": {
+            "path": "apps/api/src/tickets/ticket.entity.ts"
+          },
+          "DB": {
+            "path": "apps/api/migrations/1729900000000-add-ticket-snooze.ts"
+          }
+        }
+      },
+      "routes": [
+        {
+          "route": "PATCH /tickets/:id/snooze",
+          "status": "added",
+          "purpose": "park ticket until time",
+          "auth": "JWT, same tenant"
+        },
+        {
+          "route": "DELETE /tickets/:id/snooze",
+          "status": "added",
+          "purpose": "bring back now",
+          "auth": "JWT, same tenant"
+        },
+        {
+          "route": "GET /tickets",
+          "status": "changed",
+          "purpose": "hides snoozed; ?snoozed=true lists them",
+          "auth": "JWT, same tenant"
+        },
+        {
+          "route": "cron every minute",
+          "status": "added",
+          "purpose": "wake due tickets",
+          "auth": "internal"
+        }
+      ],
+      "walkthroughs": [
+        {
+          "title": "PATCH /tickets/:id/snooze",
+          "diagram": {
+            "mermaid": "sequenceDiagram\n  participant W as web\n  participant C as Controller\n  participant S as TicketsService\n  participant R as Repository\n  participant RC as Redis\n  W->>C: PATCH /tickets/42/snooze (until, note)\n  alt bad JWT\n    C-->>W: 401\n  else until in past\n    C-->>W: 400\n  end\n  C->>S: snooze(tenant, 42, until, user)\n  S->>R: findOne(tenant, 42)\n  alt not found\n    S-->>W: 404\n  else closed\n    S-->>W: 409\n  end\n  S->>R: setSnooze\n  S->>RC: DEL inbox:tenant\n  S-->>W: 200 Ticket"
+          }
+        },
+        {
+          "title": "cron wake",
+          "diagram": {
+            "mermaid": "sequenceDiagram\n  participant CR as Cron\n  participant S as TicketsService\n  participant R as Repository\n  participant WS as Gateway\n  CR->>S: wakeDue(now)\n  S->>R: findDueSnoozed(now), any status\n  loop each due ticket\n    S->>R: wake(id): status = open\n    S->>WS: ticket.woke\n  end\n  Note over CR,WS: runs on every api instance"
+          }
+        }
+      ],
+      "sideEffects": [
+        {
+          "what": "write snoozed_until, snoozed_by_id, note, count+1",
+          "where": "Postgres tickets",
+          "when": "PATCH snooze"
+        },
+        {
+          "what": "clear snoozed_until, set status open",
+          "where": "Postgres tickets",
+          "when": "cron, each due ticket"
+        },
+        {
+          "what": "DEL inbox:{tenantId}",
+          "where": "Redis",
+          "when": "snooze, unsnooze, wake"
+        },
+        {
+          "what": "emit ticket.woke",
+          "where": "WebSocket",
+          "when": "cron, each due ticket"
+        }
+      ],
+      "beforeAfter": [
+        {
+          "subject": "GET /tickets",
+          "before": "all non closed",
+          "after": "non closed minus snoozed"
+        },
+        {
+          "subject": "Ticket status",
+          "before": "only users change it",
+          "after": "cron can set open"
+        }
+      ]
+    }
+  ],
+  "frontend": [
+    {
+      "service": "web",
+      "ui": {
+        "tree": {
+          "mermaid": "flowchart TD\n  TH[\"TicketHeader\"]:::chg --> SM[\"SnoozeMenu\"]:::add\n  IT[\"InboxTabs\"]:::chg --> SL[\"SnoozedList\"]:::add\n  IT --> IL[\"InboxList\"]:::same\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+          "nodes": {
+            "SM": {
+              "path": "apps/web/src/app/tickets/snooze-menu/snooze-menu.component.ts"
+            },
+            "SL": {
+              "path": "apps/web/src/app/inbox/snoozed-list/snoozed-list.component.ts"
+            }
+          }
+        },
+        "changes": [
+          {
+            "component": "Ticket page",
+            "change": "Snooze button, hidden on closed. Badge with time."
+          },
+          {
+            "component": "Inbox",
+            "change": "snoozed ticket disappears at once"
+          },
+          {
+            "component": "Snoozed tab",
+            "change": "new, with count and Unsnooze"
+          }
+        ]
+      },
+      "functions": [
+        {
+          "name": "pick(preset)",
+          "where": "SnoozeMenuComponent",
+          "does": "preset to date, call api, move in store",
+          "ref": {
+            "path": "apps/web/src/app/tickets/snooze-menu/snooze-menu.component.ts",
+            "startLine": 9
+          }
+        },
+        {
+          "name": "moveToSnoozed(t)",
+          "where": "InboxStore",
+          "does": "inbox minus t, snoozed plus t",
+          "ref": {
+            "path": "apps/web/src/app/inbox/inbox.store.ts",
+            "startLine": 22
+          }
+        },
+        {
+          "name": "wake(id)",
+          "where": "InboxStore",
+          "does": "back to top of inbox",
+          "ref": {
+            "path": "apps/web/src/app/inbox/inbox.store.ts",
+            "startLine": 27
+          }
+        }
+      ],
+      "state": {
+        "flow": {
+          "mermaid": "flowchart LR\n  U1([\"click snooze\"]) --> PK[\"SnoozeMenu.pick\"] --> MV[\"InboxStore.moveToSnoozed\"]\n  E([\"WS ticket.woke\"]) --> WK[\"InboxStore.wake\"]\n  MV --> ST[(\"state$\")]:::chg\n  WK --> ST\n  ST -->|\"inbox$\"| IL[\"InboxList\"]\n  ST -->|\"snoozed$\"| SL[\"SnoozedList\"]\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+          "nodes": {
+            "MV": {
+              "path": "apps/web/src/app/inbox/inbox.store.ts",
+              "startLine": 22
+            },
+            "WK": {
+              "path": "apps/web/src/app/inbox/inbox.store.ts",
+              "startLine": 27
+            }
+          }
+        },
+        "notes": [
+          "shape: { inbox, loading } -> { inbox, snoozed, loading }",
+          "socket listener in root store constructor, lives forever (fine)"
+        ]
+      },
+      "apiCalls": [
+        "PATCH /tickets/:id/snooze",
+        "DELETE /tickets/:id/snooze",
+        "GET /tickets?snoozed=true"
+      ],
+      "imports": {
+        "mermaid": "flowchart LR\n  SM[\"SnoozeMenu\"]:::add -->|\"calls snooze\"| API[\"TicketsApi\"]:::chg\n  SM -->|\"calls moveToSnoozed\"| ST[\"InboxStore\"]:::chg\n  ST -->|\"calls socket.on\"| SK[\"SocketService\"]:::same\n  API -->|\"types only: Ticket\"| T[\"shared-types\"]:::chg\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152"
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "TicketEntity",
+      "kind": "Postgres tickets",
+      "ref": {
+        "path": "apps/api/src/tickets/ticket.entity.ts",
+        "startLine": 24,
+        "endLine": 36
+      },
+      "fields": [
+        {
+          "name": "snoozedUntil",
+          "type": "timestamptz null",
+          "status": "added",
+          "why": "when ticket returns"
+        },
+        {
+          "name": "snoozedById",
+          "type": "uuid null",
+          "status": "added",
+          "why": "who parked it"
+        },
+        {
+          "name": "snoozeNote",
+          "type": "varchar(200) null",
+          "status": "added",
+          "why": "reason on badge"
+        },
+        {
+          "name": "snoozeCount",
+          "type": "int default 0",
+          "status": "added",
+          "why": "no usage found"
+        },
+        {
+          "name": "id",
+          "type": "uuid",
+          "status": "same",
+          "why": "identify ticket"
+        },
+        {
+          "name": "tenantId",
+          "type": "uuid",
+          "status": "same",
+          "why": "isolate customer data"
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "status": "same",
+          "why": "filter inbox"
+        },
+        {
+          "name": "createdAt",
+          "type": "timestamptz",
+          "status": "same",
+          "why": "sort by newest"
+        }
+      ],
+      "note": "Migration adds 4 nullable/default columns + partial index. No table rewrite on Postgres 11+."
+    }
+  ],
+  "tests": [
+    {
+      "logic": "TicketsService.snooze",
+      "test": {
+        "name": "snoozes and clears inbox cache",
+        "ref": {
+          "path": "apps/api/src/tickets/tickets.service.spec.ts",
+          "startLine": 61
+        }
+      },
+      "errorPath": "409 yes, 404 no"
+    },
+    {
+      "logic": "TicketsService.wakeDue",
+      "errorPath": "none"
+    },
+    {
+      "logic": "SnoozeScheduler.tick",
+      "errorPath": "none"
+    }
+  ],
+  "questions": [
+    {
+      "title": "Closed tickets reopen?",
+      "detail": "findDueSnoozed matches any status, wake sets open.",
+      "ref": {
+        "path": "apps/api/src/tickets/tickets.repository.ts",
+        "startLine": 46,
+        "endLine": 54
+      }
+    },
+    {
+      "title": "Cron on every instance.",
+      "detail": "Same ticket can wake twice.",
+      "ref": {
+        "path": "apps/api/src/tickets/snooze.scheduler.ts"
+      }
+    },
+    {
+      "title": "snoozeCount: no usage found.",
+      "detail": "Written, never read.",
+      "ref": {
+        "path": "apps/api/src/tickets/ticket.entity.ts",
+        "startLine": 35
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "apps/api/src/tickets/snooze.scheduler.ts",
+      "service": "api",
+      "status": "added",
+      "tag": "logic",
+      "what": "cron, calls wakeDue"
+    },
+    {
+      "path": "apps/api/src/tickets/tickets.service.ts",
+      "service": "api",
+      "status": "changed",
+      "tag": "logic",
+      "what": "snooze rules, wakeDue loop"
+    },
+    {
+      "path": "apps/api/src/tickets/tickets.repository.ts",
+      "service": "api",
+      "status": "changed",
+      "tag": "logic",
+      "what": "inbox filter, due query"
+    },
+    {
+      "path": "apps/api/src/tickets/tickets.controller.ts",
+      "service": "api",
+      "status": "changed",
+      "tag": "glue",
+      "what": "2 routes, ?snoozed"
+    },
+    {
+      "path": "apps/web/src/app/inbox/inbox.store.ts",
+      "service": "web",
+      "status": "changed",
+      "tag": "logic",
+      "what": "snoozed list, move, wake"
+    },
+    {
+      "path": "apps/web/src/app/tickets/snooze-menu/snooze-menu.component.ts",
+      "service": "web",
+      "status": "added",
+      "tag": "logic",
+      "what": "presets to dates"
+    },
+    {
+      "path": "packages/shared-types/src/ticket.ts",
+      "service": "shared-types",
+      "status": "changed",
+      "tag": "types",
+      "what": "snooze fields"
+    }
+  ],
+  "skipped": [
+    "pnpm-lock.yaml"
+  ]
+}
