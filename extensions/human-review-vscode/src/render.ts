@@ -102,9 +102,12 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
 
   for (const b of rv.backend) {
     const g = `Backend · ${b.service}`;
-    add({ id: `be-${b.service}-flow`, group: g, label: 'Flow', html:
-      `<p class="sub">Left = outside (routes, jobs). Right = data. Arrow = imports, label = why.</p>${dg(b.flow)}` +
+    const flowSub = `<p class="sub">Left = outside (routes, jobs). Right = data. Arrow = imports, label = why.</p>`;
+    const flows = b.flows || [];
+    add({ id: `be-${b.service}-flow`, group: g, label: flows.length ? 'Flows overview' : 'Flow', html:
+      (flows.length ? `<p class="sub">One box per flow. Edge = what two flows share. Each flow has its own view below.</p>` : flowSub) + dg(b.flow) +
       (b.routes.length ? `<h3>Routes</h3>${table(['Route', '', 'Purpose', 'Auth'], b.routes.map(r => [`<code>${esc(r.route)}</code>`, chip(r.status), esc(r.purpose), esc(r.auth)]))}` : '') });
+    flows.forEach((f, i) => add({ id: `be-${b.service}-fl-${i}`, group: g, label: `Flow: ${f.title}`, html: flowSub + dg(f.diagram) }));
     b.walkthroughs.forEach((w, i) => add({ id: `be-${b.service}-wt-${i}`, group: g, label: w.title, html: dg(w.diagram) }));
     if (b.sideEffects.length || b.beforeAfter.length) add({ id: `be-${b.service}-effects`, group: g, label: 'Side effects', html:
       (b.sideEffects.length ? table(['What', 'Where', 'When'], b.sideEffects.map(x => [esc(x.what), esc(x.where), esc(x.when)])) : '') +
@@ -285,7 +288,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
   });
 
   const dark = document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast');
-  if (window.mermaid) mermaid.initialize({ startOnLoad:false, securityLevel:'loose', theme: dark ? 'dark' : 'default', flowchart:{ htmlLabels:true } });
+  if (window.mermaid) mermaid.initialize({ startOnLoad:false, securityLevel:'loose', theme: dark ? 'dark' : 'default', flowchart:{ htmlLabels:true, useMaxWidth:false }, sequence:{ useMaxWidth:false } }); // natural size; .dg scrolls instead of shrinking text
   progress();
   show((vscode.getState() || {}).view || ORDER[0]);
   vscode.postMessage({type:'ready'});

@@ -49,7 +49,9 @@ Read the code. Never guess from file names.
 **serviceMap**: `flowchart LR`, one node per changed service plus DBs/caches, labeled edges.
 
 **backend** (one per backend service)
-- `flow`: `flowchart LR`, one `subgraph` per column, strict outside to inside: `Routes / triggers` (routes as `METHOD /path`, cron, queue consumers) -> `Guards / pipes` -> `Services` -> `Repos / models` -> `Data / outside` (tables, Redis keys, queues, WebSocket, external APIs). Arrow = importer -> imported, labeled WHY.
+- Flow diagram shape: `flowchart LR`, one `subgraph` per column, strict outside to inside: `Routes / triggers` (routes as `METHOD /path`, cron, queue consumers) -> `Guards / pipes` -> `Services` -> `Repos / models` -> `Data / outside` (tables, Redis keys, queues, WebSocket, external APIs). Arrow = importer -> imported, labeled WHY.
+- `flows`: split into small diagrams, one per flow (a route or a few routes of one feature, a job, a consumer), each in the shape above, max ~12 nodes. Title = short feature name, e.g. `snooze`, `cron wake`.
+- `flow`: then the overview, `flowchart LR`, one node per flow (label = title + its routes), edges = what two flows share (`both write tickets`, `snooze sets snoozedUntil, wake reads it`, `same TicketsService`). Only 1 flow, or under ~12 nodes total: skip `flows`, put the full diagram in `flow`.
 - `routes`, `sideEffects` (every DB write, cache set/del, event, outbound call), `beforeAfter` for changed behavior.
 - `walkthroughs`: `sequenceDiagram` per new/changed route and per background job, with `alt` blocks for error paths (auth, validation, not found, conflict, job failure). Note things like "runs on every instance".
 
@@ -105,7 +107,8 @@ interface Review {
   services: { name: string; path: string; kind: 'backend'|'frontend'|'types'|'infra'|'other'; changed: string }[];
   serviceMap: Diagram;
   backend: {
-    service: string; flow: Diagram;
+    service: string; flow: Diagram;   // overview when flows given
+    flows?: { title: string; diagram: Diagram }[];
     routes: { route: string; status: Status; purpose: string; auth: string }[];
     walkthroughs: { title: string; diagram: Diagram }[];
     sideEffects: { what: string; where: string; when: string }[];

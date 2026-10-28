@@ -40,7 +40,8 @@ export interface Review {
 
   backend: {
     service: string;
-    flow: Diagram;
+    flow: Diagram;           // with flows: overview, one node per flow; without: the full routes -> data diagram
+    flows?: { title: string; diagram: Diagram }[];   // one small routes -> data diagram per flow
     routes: { route: string; status: Status; purpose: string; auth: string }[];
     walkthroughs: { title: string; diagram: Diagram }[];
     sideEffects: { what: string; where: string; when: string }[];

@@ -87,37 +87,10 @@
     {
       "service": "api",
       "flow": {
-        "mermaid": "flowchart LR\n  subgraph R[\"Routes / triggers\"]\n    P1[\"PATCH /tickets/:id/snooze\"]:::add\n    P2[\"DELETE /tickets/:id/snooze\"]:::add\n    P3[\"GET /tickets?snoozed\"]:::chg\n    CR[\"Cron every 1 min\"]:::add\n  end\n  subgraph G[\"Guards / pipes\"]\n    JG[\"JwtAuthGuard\"]:::same\n    DTO[\"SnoozeTicketDto\"]:::add\n  end\n  subgraph S[\"Services\"]\n    TS[\"TicketsService\"]:::chg\n    EG[\"EventsGateway\"]:::same\n  end\n  subgraph M[\"Repos / models\"]\n    TR[\"TicketsRepository\"]:::chg\n    TE[\"TicketEntity\"]:::chg\n  end\n  subgraph D[\"Data / outside\"]\n    DB[(\"tickets\")]:::chg\n    RC[(\"Redis inbox:tenantId\")]:::same\n    WS([\"WS ticket.woke\"]):::add\n  end\n  P1 -->|\"uses JwtAuthGuard\"| JG\n  P1 -->|\"validates SnoozeTicketDto\"| DTO\n  P1 -->|\"calls snooze\"| TS\n  P2 -->|\"calls unsnooze\"| TS\n  P3 -->|\"calls listInbox\"| TS\n  CR -->|\"calls wakeDue\"| TS\n  TS -->|\"injects TicketsRepository\"| TR\n  TS -->|\"calls toTenant\"| EG\n  TS -->|\"cache.del\"| RC\n  TR -->|\"types only: TicketEntity\"| TE\n  TE -->|\"maps to\"| DB\n  EG -->|\"emits\"| WS\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+        "mermaid": "flowchart LR\n  F1[\"snooze<br/>PATCH, DELETE /tickets/:id/snooze\"]:::add\n  F2[\"inbox list<br/>GET /tickets?snoozed\"]:::chg\n  F3[\"cron wake<br/>every 1 min\"]:::add\n  F1 -->|\"sets snoozedUntil, list hides it\"| F2\n  F1 -->|\"sets snoozedUntil, wake clears it\"| F3\n  F3 -->|\"cache.del, list refetches\"| F2\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
         "nodes": {
-          "P1": {
-            "path": "apps/api/src/tickets/tickets.controller.ts",
-            "startLine": 40
-          },
-          "P2": {
-            "path": "apps/api/src/tickets/tickets.controller.ts",
-            "startLine": 50
-          },
-          "P3": {
-            "path": "apps/api/src/tickets/tickets.controller.ts",
-            "startLine": 22
-          },
-          "CR": {
+          "F3": {
             "path": "apps/api/src/tickets/snooze.scheduler.ts"
-          },
-          "DTO": {
-            "path": "apps/api/src/tickets/dto/snooze-ticket.dto.ts"
-          },
-          "TS": {
-            "path": "apps/api/src/tickets/tickets.service.ts"
-          },
-          "TR": {
-            "path": "apps/api/src/tickets/tickets.repository.ts"
-          },
-          "TE": {
-            "path": "apps/api/src/tickets/ticket.entity.ts"
-          },
-          "DB": {
-            "path": "apps/api/migrations/1729900000000-add-ticket-snooze.ts"
           }
         }
       },
@@ -193,6 +166,77 @@
           "subject": "Ticket status",
           "before": "only users change it",
           "after": "cron can set open"
+        }
+      ],
+      "flows": [
+        {
+          "title": "snooze",
+          "diagram": {
+            "mermaid": "flowchart LR\n  subgraph R[\"Routes / triggers\"]\n    P1[\"PATCH /tickets/:id/snooze\"]:::add\n    P2[\"DELETE /tickets/:id/snooze\"]:::add\n  end\n  subgraph G[\"Guards / pipes\"]\n    JG[\"JwtAuthGuard\"]:::same\n    DTO[\"SnoozeTicketDto\"]:::add\n  end\n  subgraph S[\"Services\"]\n    TS[\"TicketsService\"]:::chg\n  end\n  subgraph M[\"Repos / models\"]\n    TR[\"TicketsRepository\"]:::chg\n  end\n  subgraph D[\"Data / outside\"]\n    DB[(\"tickets\")]:::chg\n    RC[(\"Redis inbox:tenantId\")]:::same\n  end\n  P1 -->|\"uses JwtAuthGuard\"| JG\n  P1 -->|\"validates SnoozeTicketDto\"| DTO\n  P1 -->|\"calls snooze\"| TS\n  P2 -->|\"calls unsnooze\"| TS\n  TS -->|\"injects TicketsRepository\"| TR\n  TR -->|\"sets snoozedUntil\"| DB\n  TS -->|\"cache.del\"| RC\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+            "nodes": {
+              "P1": {
+                "path": "apps/api/src/tickets/tickets.controller.ts",
+                "startLine": 40
+              },
+              "P2": {
+                "path": "apps/api/src/tickets/tickets.controller.ts",
+                "startLine": 50
+              },
+              "DTO": {
+                "path": "apps/api/src/tickets/dto/snooze-ticket.dto.ts"
+              },
+              "TS": {
+                "path": "apps/api/src/tickets/tickets.service.ts"
+              },
+              "TR": {
+                "path": "apps/api/src/tickets/tickets.repository.ts"
+              },
+              "DB": {
+                "path": "apps/api/migrations/1729900000000-add-ticket-snooze.ts"
+              }
+            }
+          }
+        },
+        {
+          "title": "inbox list",
+          "diagram": {
+            "mermaid": "flowchart LR\n  subgraph R[\"Routes / triggers\"]\n    P3[\"GET /tickets?snoozed\"]:::chg\n  end\n  subgraph S[\"Services\"]\n    TS[\"TicketsService\"]:::chg\n  end\n  subgraph M[\"Repos / models\"]\n    TR[\"TicketsRepository\"]:::chg\n  end\n  subgraph D[\"Data / outside\"]\n    DB[(\"tickets\")]:::chg\n  end\n  P3 -->|\"calls listInbox\"| TS\n  TS -->|\"injects TicketsRepository\"| TR\n  TR -->|\"filters snoozedUntil\"| DB\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+            "nodes": {
+              "P3": {
+                "path": "apps/api/src/tickets/tickets.controller.ts",
+                "startLine": 22
+              },
+              "TS": {
+                "path": "apps/api/src/tickets/tickets.service.ts"
+              },
+              "TR": {
+                "path": "apps/api/src/tickets/tickets.repository.ts"
+              },
+              "DB": {
+                "path": "apps/api/migrations/1729900000000-add-ticket-snooze.ts"
+              }
+            }
+          }
+        },
+        {
+          "title": "cron wake",
+          "diagram": {
+            "mermaid": "flowchart LR\n  subgraph R[\"Routes / triggers\"]\n    CR[\"Cron every 1 min\"]:::add\n  end\n  subgraph S[\"Services\"]\n    TS[\"TicketsService\"]:::chg\n    EG[\"EventsGateway\"]:::same\n  end\n  subgraph M[\"Repos / models\"]\n    TR[\"TicketsRepository\"]:::chg\n  end\n  subgraph D[\"Data / outside\"]\n    DB[(\"tickets\")]:::chg\n    RC[(\"Redis inbox:tenantId\")]:::same\n    WS([\"WS ticket.woke\"]):::add\n  end\n  CR -->|\"calls wakeDue\"| TS\n  TS -->|\"injects TicketsRepository\"| TR\n  TR -->|\"clears due snoozedUntil\"| DB\n  TS -->|\"cache.del\"| RC\n  TS -->|\"calls toTenant\"| EG\n  EG -->|\"emits\"| WS\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
+            "nodes": {
+              "CR": {
+                "path": "apps/api/src/tickets/snooze.scheduler.ts"
+              },
+              "TS": {
+                "path": "apps/api/src/tickets/tickets.service.ts"
+              },
+              "TR": {
+                "path": "apps/api/src/tickets/tickets.repository.ts"
+              },
+              "DB": {
+                "path": "apps/api/migrations/1729900000000-add-ticket-snooze.ts"
+              }
+            }
+          }
         }
       ]
     }

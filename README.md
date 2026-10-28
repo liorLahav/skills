@@ -13,7 +13,7 @@ What you get for a change:
 
 - **Start here**: what, why, does it match the intent, which 3 to 5 files to read first
 - **Service map**: changed services and how they relate
-- **Backend flow**: routes on the left, DB on the right, every arrow labeled with why one file imports another
+- **Backend flows**: an overview of how the flows in the change connect, then one small diagram per flow: routes on the left, DB on the right, every arrow labeled with why one file imports another
 - **Walkthroughs**: sequence diagram per route and background job, with error paths
 - **Side effects**: every DB write, cache change, event, outbound call
 - **Frontend**: UI changes, functions, state flow, imports
@@ -74,4 +74,8 @@ The JSON schema lives in `extensions/human-review-vscode/src/schema.ts` and is c
 
 - Diffs compare against the merge base, using VS Code's built-in Git extension.
 - Diagram node links need the skill to fill `nodes` and quote node labels.
-- Tested by compiling, parsing every diagram, and simulating the webview. Not yet tested by hand in every VS Code theme.
+- Tested by compiling, parsing every diagram (`npm run check`), and simulating the webview. Not yet tested by hand in every VS Code theme.
+
+### Develop
+
+See [CLAUDE.md](CLAUDE.md) for layout, build commands, and what to keep in sync.
