@@ -18,6 +18,16 @@ export interface Diagram {
   nodes?: Record<string, FileRef>;
 }
 
+/** Lowest level of the story. Files only appear as diagram nodes, labeled with their job in this flow. */
+export interface Flow {
+  title: string;             // entry point: "PATCH /tickets/:id/snooze", "cron every 1 min", "Snooze button"
+  why: string;               // which part of the step it delivers
+  diagram?: Diagram;
+  core: { ref: FileRef; explain: string }[];                    // 2-3 snippets, 5-15 lines; panel reads them from the file
+  decisions: { chose: string; instead: string; ref?: FileRef }[]; // choices the intent did not ask for
+  patterns: { did: string; repoUses: string; ref?: FileRef }[];   // new way where the repo already has one
+}
+
 export interface Review {
   version: 1;
   title: string;
@@ -31,8 +41,20 @@ export interface Review {
     what: string;
     why: string;
     intent: { matches: boolean; extra: string[]; missing: string[] };
-    readFirst: { ref: FileRef; why: string }[];
+    readFirst: { step?: number; ref?: FileRef; why: string }[];   // step (1-based) with story, else ref
     size: { files: number; additions: number; deletions: number };
+  };
+
+  /** High to low: goal -> steps (build order, like a PR stack) -> flows. Each level's why is its parent. */
+  story?: {
+    goal: string;
+    steps: {
+      title: string;         // one thing you could check by hand, no code names
+      why: string;           // which ask it serves, or which later step needs it
+      needs: number[];       // 1-based numbers of earlier steps it builds on
+      asked: boolean;        // false = not in the intent
+      flows: Flow[];
+    }[];
   };
 
   services: { name: string; path: string; kind: ServiceKind; changed: string }[];
@@ -40,8 +62,7 @@ export interface Review {
 
   backend: {
     service: string;
-    flow: Diagram;           // with flows: overview, one node per flow; without: the full routes -> data diagram
-    flows?: { title: string; diagram: Diagram }[];   // one small routes -> data diagram per flow
+    flow: Diagram;           // full routes -> data diagram; per-flow diagrams live in story
     routes: { route: string; status: Status; purpose: string; auth: string }[];
     walkthroughs: { title: string; diagram: Diagram }[];
     sideEffects: { what: string; where: string; when: string }[];

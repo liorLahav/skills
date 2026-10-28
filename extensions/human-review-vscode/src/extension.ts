@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { Review, FileRef, validate } from './schema';
-import { renderHtml } from './render';
+import { renderHtml, snippetPaths } from './render';
 
 const REVIEW_GLOB = '.review/review.json';
 
@@ -99,12 +99,18 @@ async function open(ctx: vscode.ExtensionContext) {
   render(ctx);
 }
 
-function render(ctx: vscode.ExtensionContext) {
+async function render(ctx: vscode.ExtensionContext) {
+  if (!panel || !current) return;
+  // Core snippets show the file as it is now, not a copy from when the review was written.
+  const lines: Record<string, string[]> = {};
+  for (const p of snippetPaths(current.review)) {
+    try { lines[p] = Buffer.from(await vscode.workspace.fs.readFile(fileUri(p))).toString('utf8').split(/\r?\n/); } catch { /* deleted or moved: panel says file not found */ }
+  }
   if (!panel || !current) return;
   const nonce = crypto.randomBytes(16).toString('base64');
   const mermaidUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, 'media', 'mermaid.min.js')).toString();
   panel.title = `Review: ${current.review.title}`;
-  panel.webview.html = renderHtml(current.review, { cspSource: panel.webview.cspSource, nonce, mermaidUri });
+  panel.webview.html = renderHtml(current.review, { cspSource: panel.webview.cspSource, nonce, mermaidUri, lines });
 }
 
 async function onMessage(ctx: vscode.ExtensionContext, m: any) {

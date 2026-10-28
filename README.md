@@ -11,15 +11,17 @@ My Claude Code skills, plus the tools that go with them.
 
 What you get for a change:
 
-- **Start here**: what, why, does it match the intent, which 3 to 5 files to read first
+- **Start here**: what, why, does it match the intent, which steps to read first
 - **Service map**: changed services and how they relate
-- **Backend flows**: an overview of how the flows in the change connect, then one small diagram per flow: routes on the left, DB on the right, every arrow labeled with why one file imports another
+- **Story**: high level to low level, like a PR stack. Goal, then steps in build order (each one thing you could check by hand, with why it exists and which steps it builds on), then flows. Each flow: why, a diagram where every file shows its job in this flow, the 2 to 3 core code snippets with plain explanations, and the choices the agent made that you did not ask for
+- **Backend flow**: the full picture, routes on the left, DB on the right, every arrow labeled with why one file imports another
 - **Walkthroughs**: sequence diagram per route and background job, with error paths
 - **Side effects**: every DB write, cache change, event, outbound call
 - **Frontend**: UI changes, functions, state flow, imports
 - **Data models**: every field with a 4 word reason it exists; `no usage found` is flagged
 - **Tests**: which changed logic has a test and which does not
-- **Open questions**: things the agent decided that you did not ask for
+- **Agent decisions**: every choice you did not ask for, and every place it ignored a pattern the repo already has
+- **Open questions**: what is unclear
 
 Every file in tables and diagram nodes has **file** (opens at the lines) and **diff** (VS Code diff, merge base vs your working tree) links. Tick files as reviewed; progress is saved per branch.
 

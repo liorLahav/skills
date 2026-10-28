@@ -1,10 +1,15 @@
-import { Diagram, FileRef, Review, Status } from './schema';
+import { Diagram, FileRef, Flow, Review, Status } from './schema';
 
 export interface RenderOpts {
   cspSource: string;
   nonce: string;
   mermaidUri: string;
+  lines?: Record<string, string[]>;   // current file contents for story core snippets, by path
 }
+
+/** Files whose lines the story's core snippets show. */
+export const snippetPaths = (rv: Review) =>
+  [...new Set((rv.story?.steps || []).flatMap(s => s.flows.flatMap(f => (f.core || []).map(c => c.ref.path))))];
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
@@ -61,7 +66,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
   };
 
   const s = rv.start;
-  type View = { id: string; group: string; label: string; badge?: string; html: string };
+  type View = { id: string; group: string; label: string; badge?: string; tip?: string; html: string };
   const views: View[] = [];
   const add = (v: View) => views.push(v);
 
@@ -73,7 +78,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
         <dt>Intent</dt><dd>${(s.intent.extra.length ? `<div><b>Not asked:</b> ${s.intent.extra.map(esc).join('; ')}</div>` : '') +
           (s.intent.missing.length ? `<div><b>Asked, missing:</b> ${s.intent.missing.map(esc).join('; ')}</div>` : '') || 'matches'}</dd>
         <dt>Read first</dt><dd><ol class="read">${s.readFirst.map(r =>
-          `<li>${links(r.ref, true)}<div class="sub">${esc(r.why)}</div></li>`).join('')}</ol></dd>
+          `<li>${r.step && rv.story ? `<a href="#" data-go="step-${r.step}"><b>Step ${r.step} · ${esc(rv.story.steps[r.step - 1]?.title)}</b></a>` : links(r.ref, true)}<div class="sub">${esc(r.why)}</div></li>`).join('')}</ol></dd>
         <dt>Size</dt><dd class="mono">${s.size.files} files · +${s.size.additions} / −${s.size.deletions} · ${rv.services.map(x => esc(x.name)).join(', ')}</dd>
         <dt>Questions</dt><dd><a href="#" data-go="questions">${rv.questions.length} open</a></dd>
       </dl>
@@ -82,6 +87,50 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
   add({ id: 'services', group: 'Overview', label: 'Service map', html:
     dg(rv.serviceMap) +
     table(['Service', 'Kind', 'What changed'], rv.services.map(x => [`<code>${esc(x.path)}</code>`, esc(x.kind), esc(x.changed)])) });
+
+  if (rv.story) {
+    const steps = rv.story.steps;
+    const stepLink = (n: number) => `<a href="#" data-go="step-${n}">Step ${n}</a>`;
+    const stepLinks = (ns: number[]) => ns.map(stepLink).join(', ');
+    const notAsked = (x: { asked: boolean }) => x.asked ? '' : ' <span class="chip warn">not asked</span>';
+    // Files in the diagrams of more than one step: that is how the steps connect.
+    const inSteps: Record<string, number[]> = {};
+    steps.forEach((st, i) => st.flows.forEach(f => Object.values(f.diagram?.nodes || {}).forEach(r => {
+      const u = (inSteps[r.path] ||= []);
+      if (!u.includes(i + 1)) u.push(i + 1);
+    })));
+    const snippet = (c: Flow['core'][number]) => {
+      const a = c.ref.startLine ?? 1, lines = o.lines?.[c.ref.path];
+      const code = lines ? lines.slice(a - 1, c.ref.endLine ?? a).map((l, k) => `<span class="ln">${a + k}</span>${esc(l)}`).join('\n')
+        : `<span class="sub">${o.lines ? 'file not found' : 'code shows in VS Code'}</span>`;
+      return `<div class="snip"><div class="snh">${links(c.ref, true)}</div><pre>${code}</pre><div class="sne">${esc(c.explain)}</div></div>`;
+    };
+    const flowHtml = (f: Flow, n: number) => {
+      const shared = Object.values(f.diagram?.nodes || {}).filter((r, k, all) => all.findIndex(x => x.path === r.path) === k)
+        .map(r => [r, (inSteps[r.path] || []).filter(m => m !== n)] as const).filter(([, others]) => others.length);
+      const notes = [
+        ...(f.decisions || []).map(d => `<li>⚖ <b>${esc(d.chose)}</b>. Instead: ${esc(d.instead)} ${links(d.ref)}</li>`),
+        ...(f.patterns || []).map(p => `<li>⤳ <b>${esc(p.did)}</b>. Repo uses: ${esc(p.repoUses)} ${links(p.ref)}</li>`)];
+      return `<h3>${esc(f.title)}</h3><p><b>Why:</b> ${esc(f.why)}</p>${dg(f.diagram)}` +
+        (shared.length ? `<p class="sub">Shared: ${shared.map(([r, others]) => `<code>${esc(r.path.split('/').pop())}</code> also in ${stepLinks(others)}`).join('; ')}</p>` : '') +
+        ((f.core || []).length ? `<h4>Core code</h4>${f.core.map(snippet).join('')}` : '') +
+        (notes.length ? `<h4>Agent choices</h4><ul class="ba">${notes.join('')}</ul>` : '');
+    };
+    add({ id: 'story', group: 'Story', label: 'Goal', html:
+      `<p><b>Goal:</b> ${esc(rv.story.goal)}</p><p class="sub">Steps in build order, like a PR stack. Each level is why the level below exists. Click a step to go down.</p>` +
+      `<ol class="tree">${steps.map((st, i) => `<li><a href="#" data-go="step-${i + 1}"><b>${esc(st.title)}</b></a>${notAsked(st)}` +
+        `<div class="sub">${esc(st.why)}${st.needs.length ? ` · needs ${stepLinks(st.needs)}` : ''}</div>` +
+        `<ul>${st.flows.map(f => `<li><code>${esc(f.title)}</code> <span class="sub">${esc(f.why)}</span></li>`).join('')}</ul></li>`).join('')}</ol>` });
+    steps.forEach((st, i) => {
+      const n = i + 1, neededBy = steps.flatMap((x, j) => x.needs.includes(n) ? [j + 1] : []);
+      add({ id: `step-${n}`, group: 'Story', label: `${n} · ${st.title}`, tip: `Why: ${st.why}`, html:
+        `<p class="sub">↑ goal: <a href="#" data-go="story">${esc(rv.story!.goal)}</a></p>` +
+        `<p><b>Why:</b> ${esc(st.why)}${notAsked(st)}</p>` +
+        (st.needs.length || neededBy.length ? `<p class="sub">${st.needs.length ? `Builds on ${stepLinks(st.needs)}. ` : ''}${neededBy.length ? `Needed by ${stepLinks(neededBy)}.` : ''}</p>` : '') +
+        st.flows.map(f => flowHtml(f, n)).join('') });
+    });
+  }
+
 
   const fileList = (service: string) => {
     const fs = rv.files.filter(f => f.service === service);
@@ -102,12 +151,9 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
 
   for (const b of rv.backend) {
     const g = `Backend · ${b.service}`;
-    const flowSub = `<p class="sub">Left = outside (routes, jobs). Right = data. Arrow = imports, label = why.</p>`;
-    const flows = b.flows || [];
-    add({ id: `be-${b.service}-flow`, group: g, label: flows.length ? 'Flows overview' : 'Flow', html:
-      (flows.length ? `<p class="sub">One box per flow. Edge = what two flows share. Each flow has its own view below.</p>` : flowSub) + dg(b.flow) +
+    add({ id: `be-${b.service}-flow`, group: g, label: 'Flow', html:
+      `<p class="sub">Left = outside (routes, jobs). Right = data. Arrow = imports, label = why.</p>${dg(b.flow)}` +
       (b.routes.length ? `<h3>Routes</h3>${table(['Route', '', 'Purpose', 'Auth'], b.routes.map(r => [`<code>${esc(r.route)}</code>`, chip(r.status), esc(r.purpose), esc(r.auth)]))}` : '') });
-    flows.forEach((f, i) => add({ id: `be-${b.service}-fl-${i}`, group: g, label: `Flow: ${f.title}`, html: flowSub + dg(f.diagram) }));
     b.walkthroughs.forEach((w, i) => add({ id: `be-${b.service}-wt-${i}`, group: g, label: w.title, html: dg(w.diagram) }));
     if (b.sideEffects.length || b.beforeAfter.length) add({ id: `be-${b.service}-effects`, group: g, label: 'Side effects', html:
       (b.sideEffects.length ? table(['What', 'Where', 'When'], b.sideEffects.map(x => [esc(x.what), esc(x.where), esc(x.when)])) : '') +
@@ -149,6 +195,13 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
       [`<code>${esc(t.logic)}</code>`, t.test ? `${esc(t.test.name)} ${links(t.test.ref)}` : '<b>none</b>', esc(t.errorPath)]),
       i => rv.tests[i].test ? '' : 'gap') +
     `<p class="sub">Highlighted rows have no test. Green CI only covers what is listed here.</p>` });
+  const choices = (rv.story?.steps || []).flatMap((st, i) => st.flows.flatMap(f => [
+    ...(f.decisions || []).map(d => [`⚖ ${esc(d.chose)}`, esc(d.instead), d]),
+    ...(f.patterns || []).map(p => [`⤳ ${esc(p.did)}`, `repo uses: ${esc(p.repoUses)}`, p])]
+    .map(([what, other, x]) => [`<a href="#" data-go="step-${i + 1}">${i + 1}</a> · ${esc(f.title)}`, what as string, other as string, links((x as { ref?: FileRef }).ref)])));
+  if (choices.length) add({ id: 'choices', group: 'Check', label: 'Agent decisions', badge: `<span class="warnb">${choices.length}</span>`, html:
+    `<p class="sub">⚖ = choice you did not ask for. ⤳ = new way where the repo already has one.</p>` +
+    table(['Step · flow', 'Agent did', 'Instead / repo uses', ''], choices) });
   add({ id: 'questions', group: 'Check', label: 'Open questions', badge: rv.questions.length ? `<span class="warnb">${rv.questions.length}</span>` : undefined, html:
     `<ol class="q">${rv.questions.map(q => `<li><div><b>${esc(q.title)}</b> ${esc(q.detail)}</div>${q.ref ? `<div class="src">${links(q.ref, true)}</div>` : ''}</li>`).join('')}</ol>` +
     (rv.skipped.length ? `<p class="sub mono">skipped: ${rv.skipped.map(esc).join(', ')}</p>` : '') });
@@ -157,7 +210,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
   const groups: string[] = [];
   for (const v of views) if (!groups.includes(v.group)) groups.push(v.group);
   const menu = groups.map(g => `<div class="mg"><div class="mgt">${esc(g)}</div>${views.filter(v => v.group === g).map(v =>
-    `<button type="button" class="mi" data-go="${esc(v.id)}" title="${esc(v.label)}"><span>${esc(v.label)}</span>${v.badge ?? ''}</button>`).join('')}</div>`).join('');
+    `<button type="button" class="mi" data-go="${esc(v.id)}" title="${esc(v.tip ? `${v.label}\n${v.tip}` : v.label)}"><span>${esc(v.label)}</span>${v.badge ?? ''}</button>`).join('')}</div>`).join('');
 
   const viewsHtml = views.map((v, i) => `
     <div class="view" data-view="${esc(v.id)}" hidden>
@@ -367,6 +420,14 @@ tr.gone td:first-child{text-decoration:line-through;color:var(--muted)}
 .file .what{color:var(--muted)}
 .rev{padding-top:2px}
 ul.ba{margin:0;padding-left:18px;display:grid;gap:4px}
+.tree{margin:0;padding-left:22px;display:grid;gap:12px}.tree ul{padding-left:18px;margin-top:4px;display:grid;gap:2px}
+h4{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:8px 0 0}
+.snip{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.snh{padding:4px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.snip pre{margin:0;padding:8px 10px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+.snip .ln{display:inline-block;min-width:3.5ch;margin-right:12px;text-align:right;color:var(--muted);user-select:none}
+.sne{padding:6px 10px;border-top:1px solid var(--line)}
+.chip.warn{color:var(--warn);border-color:var(--warn)}
 .q{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .q li{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:6px;padding:8px 12px;display:grid;gap:4px}
 .q .src{font-size:12px}

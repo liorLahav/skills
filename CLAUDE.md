@@ -39,3 +39,4 @@ Installed skill copy: `~/.claude/skills/human-review/SKILL.md`. Copy it again af
 - Node file/diff links: render.ts adds a `[ file ] [ diff ]` placeholder line to mapped node labels, the webview swaps it for real links. Only for flowcharts, only for ids in `nodes`.
 - Webview CSP: scripts need the nonce. No external URLs; Mermaid is copied into `media/` by `scripts/copy-mermaid.js`.
 - Mermaid's parser needs a DOM in Node: `check.mjs` sets up jsdom globals.
+- Story core snippets are not stored in review.json: `extension.ts` reads the lines from the working tree on each render (`snippetPaths` in render.ts). Line ranges can drift if the file changes after the review was written.
