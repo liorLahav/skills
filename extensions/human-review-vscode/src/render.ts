@@ -32,7 +32,7 @@ function table(head: string[], rows: string[][], rowClass?: (i: number) => strin
 }
 
 /** Placeholder line added under mapped node labels. Mermaid sizes the node for it; the webview swaps it for real links. */
-export const LINK_TEXT = 'file · diff';
+export const LINK_TEXT = '[ file ] [ diff ]';
 
 const OPENERS = ['([', '[(', '[[', '((', '[/', '[\\', '{{', '[', '(', '{', '>'];
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -154,7 +154,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
   const groups: string[] = [];
   for (const v of views) if (!groups.includes(v.group)) groups.push(v.group);
   const menu = groups.map(g => `<div class="mg"><div class="mgt">${esc(g)}</div>${views.filter(v => v.group === g).map(v =>
-    `<button type="button" class="mi" data-go="${esc(v.id)}"><span>${esc(v.label)}</span>${v.badge ?? ''}</button>`).join('')}</div>`).join('');
+    `<button type="button" class="mi" data-go="${esc(v.id)}" title="${esc(v.label)}"><span>${esc(v.label)}</span>${v.badge ?? ''}</button>`).join('')}</div>`).join('');
 
   const viewsHtml = views.map((v, i) => `
     <div class="view" data-view="${esc(v.id)}" hidden>
@@ -188,7 +188,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
 (function(){
   const vscode = acquireVsCodeApi();
   const DIAGRAMS = ${JSON.stringify(diagrams).replace(/</g, '\\u003c')};
-  const LINK_TEXT = ${JSON.stringify(LINK_TEXT)};
+  const LINK_RE = new RegExp(${JSON.stringify(String.raw`\[\s*file\s*\]\s*\[\s*diff\s*\]`)});
   const ORDER = Array.from(document.querySelectorAll('.view')).map(v => v.dataset.view);
 
   // In every mapped node, replace the "file · diff" placeholder with two real links.
@@ -204,13 +204,14 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
         const walker = document.createTreeWalker(g, NodeFilter.SHOW_TEXT);
         let t;
         while ((t = walker.nextNode())) {
-          if (!t.nodeValue.includes(LINK_TEXT)) continue;
+          const mm = t.nodeValue.match(LINK_RE);
+          if (!mm) continue;
           const span = document.createElement('span');
           span.className = 'nl';
           const f = document.createElement('a'); f.href = '#'; f.textContent = 'file'; f.dataset.open = JSON.stringify(ref);
           const d = document.createElement('a'); d.href = '#'; d.textContent = 'diff'; d.dataset.diff = ref.path;
-          span.append(f, ' · ', d);
-          const [before, after] = t.nodeValue.split(LINK_TEXT);
+          span.append(f, d);
+          const before = t.nodeValue.slice(0, mm.index), after = t.nodeValue.slice(mm.index + mm[0].length);
           t.replaceWith(before, span, after);
           break;
         }
@@ -300,6 +301,7 @@ const CSS = `
 --del:var(--vscode-gitDecoration-deletedResourceForeground,#f85149);--warn:var(--vscode-editorWarning-foreground,#cca700);
 --mono:var(--vscode-editor-font-family,monospace)}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--vscode-font-family);font-size:13.5px;line-height:1.55;margin:0;padding:0}
 h1{font-size:18px;margin:0}h2{font-size:17px;margin:0}
 header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 20px}
@@ -311,7 +313,7 @@ header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px so
 .mi:hover{background:var(--vscode-list-hoverBackground,var(--surface))}
 .mi.on{background:var(--vscode-list-activeSelectionBackground,var(--surface));color:var(--vscode-list-activeSelectionForeground,var(--fg))}
 .mi:focus-visible,.pager button:focus-visible{outline:1px solid var(--vscode-focusBorder);outline-offset:-1px}
-.mi span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mi span:first-child{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .mi [data-files],.warnb{font-family:var(--mono);font-size:10.5px;color:var(--muted);flex:none}
 .warnb{color:var(--warn)}
 .mi [data-files].done{color:var(--add)}
@@ -333,14 +335,18 @@ code,.mono{font-family:var(--mono);font-size:.92em}
 .kv{display:grid;grid-template-columns:100px 1fr;gap:6px 14px;margin:0}
 .kv dt{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:2px}.kv dd{margin:0;min-width:0}
 ol.read{margin:0;padding-left:18px;display:grid;gap:6px}
-.links{font-family:var(--mono);font-size:12px;white-space:nowrap}
+.links{font-family:var(--mono);font-size:12px;white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.links a{display:inline-block;padding:1px 8px;border:1px solid var(--line);border-radius:4px;line-height:1.6}
+.links a:hover{background:var(--vscode-list-hoverBackground,var(--surface));text-decoration:none}
 .chip{font-family:var(--mono);font-size:10.5px;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .chip.added{color:var(--add);border-color:var(--add)}.chip.changed{color:var(--chg);border-color:var(--chg)}.chip.removed{color:var(--del);border-color:var(--del)}
 .chip.tag-logic{color:var(--fg);border-color:var(--fg)}
 .dg{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto;min-width:0}
 .dg pre.mermaid{margin:0;background:transparent;color:var(--fg)}
-.dg .nl{font-family:var(--mono);font-size:11px;white-space:nowrap}
-.dg .nl a{color:#2b59c3;text-decoration:underline}
+.dg foreignObject{overflow:visible}
+.dg .nl{font:inherit;font-size:.9em;white-space:nowrap;display:inline-flex;gap:6px;margin-top:3px}
+.dg .nl a{color:#1d4ed8;background:rgba(255,255,255,.85);border:1px solid #1d4ed8;border-radius:4px;padding:0 5px;line-height:1.5;text-decoration:none;cursor:pointer}
+.dg .nl a:hover{background:#1d4ed8;color:#fff}
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
 table{border-collapse:collapse;width:100%}
 th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top}
