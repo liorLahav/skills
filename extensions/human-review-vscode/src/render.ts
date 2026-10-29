@@ -90,6 +90,9 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
   const readFirstSteps = new Set(s.readFirst.flatMap(r => r.step ? [r.step] : []));
   const badges = (st: { asked: boolean }, n: number) =>
     (readFirstSteps.has(n) ? ' <span class="chip start">start here</span>' : '') + (st.asked ? '' : ' <span class="chip warn">not asked</span>');
+  // Cards say what it does in a few words; older reviews have no summary, so show the why cut to two lines.
+  const cardLine = (x: { summary?: string; why: string }) => x.summary
+    ? `<span class="d full">${esc(x.summary)}</span>` : `<span class="d">${esc(x.why)}</span>`;
   const stepLinks = (ns: number[]) => ns.map(n => `<a href="#" data-nav="step-${n}">step ${n}</a>`).join(', ');
   const allDecisions = steps.flatMap((st, i) => st.flows.flatMap((f, j) => decisionsOf(f).map(d => ({ d, n: i + 1, m: j + 1, flow: f.title }))));
   const untested = rv.tests.filter(t => !t.test);
@@ -102,8 +105,8 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
       `<p><b>Why:</b> ${esc(st.why)}</p>` +
       (st.needs.length || neededBy.length ? `<p class="sub">${st.needs.length ? `Builds on ${stepLinks(st.needs)}. ` : ''}${neededBy.length ? `Needed by ${stepLinks(neededBy)}.` : ''}</p>` : '') +
       lbl('Flows') + st.flows.map((f, j) => nav(`flow-${n}-${j + 1}`,
-        `<span class="t">${esc(f.title)}</span><span class="d">${esc(f.why)}</span>` +
-        (decisionsOf(f).length ? `<span class="d">${decisionsOf(f).length} decisions</span>` : ''))).join('') });
+        `<span class="t">${esc(f.title)}</span>${cardLine(f)}` +
+        (decisionsOf(f).length ? `<span class="d">${decisionsOf(f).length} decision${decisionsOf(f).length === 1 ? "" : "s"}</span>` : ''))).join('') });
     st.flows.forEach((f, j) => {
       const decs = decisionsOf(f);
       add({ id: `flow-${n}-${j + 1}`, col: 3, parent: `step-${n}`, title: f.title, html:
@@ -174,7 +177,7 @@ export function renderHtml(rv: Review, o: RenderOpts): string {
     (s.readFirst.some(r => r.ref && !r.step) ? lbl('Read first') + `<ol class="read">${s.readFirst.filter(r => r.ref && !r.step).map(r =>
       `<li>${links(r.ref, true)}<div class="sub">${esc(r.why)}</div></li>`).join('')}</ol>` : '') +
     (steps.length ? lbl('Steps, in build order') + steps.map((st, i) => nav(`step-${i + 1}`,
-      `<span class="t"><span class="n">${i + 1}</span>${esc(st.title)}${badges(st, i + 1)}</span><span class="d">${esc(st.why)}</span>`)).join('') : '') +
+      `<span class="t"><span class="n">${i + 1}</span>${esc(st.title)}${badges(st, i + 1)}</span>${cardLine(st)}`)).join('') : '') +
     lbl('Then') +
     nav('check', `<span class="t">Check</span><span class="d">${untested.length} untested · ${allDecisions.length} decisions · ${rv.questions.length} questions</span>`) +
     nav('details', `<span class="t">Details</span><span class="d">service map, backend, frontend, data, files · <span data-files>0/${rv.files.length}</span> reviewed</span>`);
@@ -385,6 +388,7 @@ header{flex:none;border-bottom:1px solid var(--line);display:flex;gap:12px;align
 .card:focus-visible{outline:1px solid var(--focus);outline-offset:-1px}
 .card .t{font-weight:600}.card .n{color:var(--muted);font-weight:500;margin-right:8px}
 .card .d{color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .d.full{display:block}
 .keys{font-size:11px;color:var(--muted);margin-top:18px}
 .hint{margin-top:4px}
 @media (max-width:900px){

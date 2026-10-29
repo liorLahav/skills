@@ -9,7 +9,8 @@ Goal: make the human understand the change, not grade it. Assume an agent wrote 
 
 Output: `.review/review.json` in the repo root, matching the schema at the bottom. The Human Review VS Code extension renders it and turns every path into clickable file and diff links. Only build an HTML artifact instead if the user asks for one (e.g. reviewing on phone).
 
-Writing rule for every string: short and plain. Everyday words a reviewer new to this code gets on first read. No code names inside an explanation (they go in titles and links). A term the reader would have to look up: say what it is, in a few words, the first time (`Clerk, the sign-in service`). No filler.
+Writing rule for every string: short and plain. Everyday words a reviewer new to this code gets on first read. No code names inside an explanation (they go in titles and links). A term the reader would have to look up: say what it is, in a few words, the first time (`Clerk, the sign-in service`). No filler. Basic dev terms (token, route, header, cache) are fine; compressed phrases are not: no noun lists (`sign-in, approval gate, then token`), no `X, else Y`. Write a short sentence with a verb.
+- Bad: `role check, else waiting message`. Good: `Shows the console only to approved salesmen. Everyone else sees: waiting for approval.`
 - Bad: `onRequest after Clerk hook`. Good: `then checks the salesman role`.
 - Bad: `hookName onRequest | instead: preHandler; 400 before 401`. Good: chose `check sign-in as soon as a request arrives`, instead `Clerk's default, checks later`, why `else bad input answers before "not signed in"`.
 
@@ -54,19 +55,21 @@ Read the code. Never guess from file names.
 - `goal`: one line, the outcome the change is for, from the intent. Not a feature list.
 - `steps`: 2 to 7, in build order, like stacked PRs. A step = one thing you could check by hand in the app (`Agent can snooze a ticket`, `Snoozed tickets come back when due`), no code names. Groundwork several steps need (columns, migrations, shared types) is its own first step. Over 7: ask which part to cover.
   - `why`: why the step is in the change at all, NOT what it does. Which part of the goal it serves and what is broken without it (`without it snoozed tickets never come back`), or which later steps need it (`steps 2 to 4 store and read this`). From the intent, PR body, commits.
+  - `summary`: the line on the step's card: what it does, under ~10 plain words, a full short sentence: `Server turns away anyone not approved.` Not the why.
   - `needs`: earlier step numbers it builds on. `asked`: false when the intent did not ask for it (`why`: `not asked: <likely reason>`, add a question).
 - `flows` per step: each entry point that delivers it: route (`PATCH /tickets/:id/snooze`), job (`cron every 1 min`), consumer, UI action (`Snooze button`), migration. The flow is the lowest level; files only appear inside its diagram.
-  - `why`: which part of the step it delivers.
-  - `diagram`: flow diagram shape (below), only this flow's files, max ~12 nodes. Every file node label = name + its job in THIS flow in plain words, max 6: `TS["TicketsService<br/>finds due, clears snooze, notifies"]`. Every arrow = what happens next, plain, max 6 words: `then checks the role`, not a hook or function name. Fill `nodes` for every file node (the panel uses them to link steps that share a file).
+  - `summary`: the line on the flow's card, under ~10 plain words: `Sign-in page, waiting screen, then the console.`
+  - `why`: one plain sentence, which part of the step it delivers: `Signs the salesman in, waits for approval, then sends proof of sign-in on every server call.`
+  - `diagram`: `flowchart TD`, top to bottom in the order things happen (it sits in a narrow column; no column subgraphs), only this flow's files, max ~10 nodes. Every file node label = code name, then one or two short plain sentences on what it does in THIS flow (about 15 words max): `TS["TicketsService<br/>Finds tickets that are due, clears their snooze, and tells the inbox."]`. Every arrow = what happens next, plain, max 6 words: `then checks the role`, not a hook or function name. Fill `nodes` for every file node (the panel uses them to link steps that share a file).
   - `core` (shown as Key code): 1 to 3 places where the real logic of this flow lives, as `ref` with exact `startLine`/`endLine`. The panel shows only the file name and lines with file/diff links, not the code. `explain`: one short plain line, what happens there: `finds due tickets, clears them in one update`.
   - `decisions`: choices the intent did not ask for: defaults, limits, timing, concurrency, error handling, timezones. Also where the agent wrote its own way and the repo already has one (grep before claiming). Three short plain parts, max ~10 words each: `chose` `polls every minute`; `instead` `a delayed job per ticket`; `why` `simpler, but up to 1 min late`. Pattern break: `chose` `own date math`; `instead` `the repo's date-fns helpers`; `why` (the agent's likely reason, or `no reason found`). `ref` where it happens.
 - Every changed `logic`/`types` file must be a node in at least one flow. A file that fits no step is a missing step (often `asked: false`).
 
-**Flow diagram shape**: `flowchart LR`, one `subgraph` per column, strict outside to inside: `Routes / triggers` (routes as `METHOD /path`, cron, queue consumers) -> `Guards / pipes` -> `Services` -> `Repos / models` -> `Data / outside` (tables, Redis keys, queues, WebSocket, external APIs). Arrow = importer -> imported, labeled WHY. Frontend flows: `UI action -> component -> store/service -> API call`.
+**Backend diagram shape** (only for `backend.flow` in Details; story flows are top to bottom, see above): `flowchart LR`, one `subgraph` per column, strict outside to inside: `Routes / triggers` (routes as `METHOD /path`, cron, queue consumers) -> `Guards / pipes` -> `Services` -> `Repos / models` -> `Data / outside` (tables, Redis keys, queues, WebSocket, external APIs). Arrow = importer -> imported, labeled WHY. Frontend flows: `UI action -> component -> store/service -> API call`.
 Columns only fit a flow that enters at a route/trigger and ends at data. Prompt, docs or config changes, or a flow that starts outside (an external system's event or failure, `calendar read failed`): no column subgraphs; draw what happens in order, left to right, first event leftmost. Never let arrows run right to left; if they would, the columns are wrong for this flow.
 
 **backend** (one per backend service, reference for the whole picture)
-- `flow`: the full diagram of all changed routes to data, flow diagram shape.
+- `flow`: the full diagram of all changed routes to data, backend diagram shape.
 - `routes`, `sideEffects` (every DB write, cache set/del, event, outbound call), `beforeAfter` for changed behavior.
 - `walkthroughs`: `sequenceDiagram` per new/changed route and per background job, with `alt` blocks for error paths (auth, validation, not found, conflict, job failure). Note things like "runs on every instance".
 
@@ -110,7 +113,7 @@ type Tag = 'logic' | 'glue' | 'types' | 'test' | 'config';
 interface FileRef { path: string; startLine?: number; endLine?: number }   // repo relative, 1-based
 interface Diagram { mermaid: string; nodes?: Record<string, FileRef> }
 interface Flow {
-  title: string; why: string; diagram?: Diagram;
+  title: string; summary: string; why: string; diagram?: Diagram;
   core: { ref: FileRef; explain: string }[];   // key code: refs only
   decisions: { chose: string; instead: string; why: string; ref?: FileRef }[];   // includes pattern breaks
 }
@@ -127,7 +130,7 @@ interface Review {
   };
   story?: {
     goal: string;
-    steps: { title: string; why: string; needs: number[]; asked: boolean; flows: Flow[] }[];
+    steps: { title: string; summary: string; why: string; needs: number[]; asked: boolean; flows: Flow[] }[];
   };
   services: { name: string; path: string; kind: 'backend'|'frontend'|'types'|'infra'|'other'; changed: string }[];
   serviceMap: Diagram;

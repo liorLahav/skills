@@ -45,12 +45,14 @@
     "steps": [
       {
         "title": "Tickets can store a snooze time",
+        "summary": "Adds the snooze columns to tickets.",
         "why": "steps 2 to 4 all write or read snoozedUntil",
         "needs": [],
         "asked": true,
         "flows": [
           {
             "title": "migration add-ticket-snooze",
+            "summary": "Adds three empty columns, old rows untouched.",
             "why": "adds the columns, existing rows stay unsnoozed",
             "diagram": {
               "mermaid": "flowchart LR\n  MIG[\"add-ticket-snooze<br/>adds 3 nullable columns\"]:::add\n  TE[\"TicketEntity<br/>maps the new columns\"]:::chg\n  ST[\"shared Ticket type<br/>same fields for web and api\"]:::chg\n  DB[(\"tickets\")]:::chg\n  MIG -->|\"ALTER TABLE\"| DB\n  TE -->|\"maps to\"| DB\n  ST -->|\"mirrors\"| TE\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
@@ -103,6 +105,7 @@
       },
       {
         "title": "Agent can snooze and unsnooze a ticket",
+        "summary": "Agent snoozes or unsnoozes a ticket.",
         "why": "the ask: park a ticket until the customer can reply",
         "needs": [
           1
@@ -111,6 +114,7 @@
         "flows": [
           {
             "title": "PATCH / DELETE /tickets/:id/snooze",
+            "summary": "Saves or clears the snooze time.",
             "why": "sets or clears the snooze time",
             "diagram": {
               "mermaid": "flowchart LR\n  P1[\"TicketsController<br/>PATCH and DELETE snooze\"]:::add\n  DTO[\"SnoozeTicketDto<br/>until in future, note max 500\"]:::add\n  TS[\"TicketsService<br/>404 or 409, then save\"]:::chg\n  TR[\"TicketsRepository<br/>update one ticket\"]:::chg\n  DB[(\"tickets\")]:::chg\n  RC[(\"Redis inbox:tenantId\")]:::same\n  P1 -->|\"validates body\"| DTO\n  P1 -->|\"calls snooze / unsnooze\"| TS\n  TS -->|\"saves snoozedUntil\"| TR\n  TR -->|\"UPDATE\"| DB\n  TS -->|\"cache.del so inbox refetches\"| RC\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
@@ -155,6 +159,7 @@
           },
           {
             "title": "Snooze button",
+            "summary": "Agent picks a time from presets.",
             "why": "how the agent picks a time",
             "diagram": {
               "mermaid": "flowchart LR\n  SM[\"SnoozeMenuComponent<br/>preset to a date\"]:::add\n  IS[\"InboxStore<br/>moves ticket to Snoozed tab\"]:::chg\n  API([\"PATCH /tickets/:id/snooze\"]):::add\n  SM -->|\"calls moveToSnoozed\"| IS\n  IS -->|\"HTTP\"| API\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
@@ -204,6 +209,7 @@
       },
       {
         "title": "Snoozed tickets are hidden from the inbox",
+        "summary": "Inbox leaves snoozed tickets out.",
         "why": "without the filter snoozed tickets still clutter the inbox",
         "needs": [
           1,
@@ -213,6 +219,7 @@
         "flows": [
           {
             "title": "GET /tickets?snoozed",
+            "summary": "Inbox hides snoozed, the tab shows them.",
             "why": "inbox skips snoozed, the Snoozed tab asks for them",
             "diagram": {
               "mermaid": "flowchart LR\n  P3[\"TicketsController<br/>reads ?snoozed\"]:::chg\n  TS[\"TicketsService<br/>passes the flag\"]:::chg\n  TR[\"TicketsRepository<br/>filters on snoozedUntil\"]:::chg\n  DB[(\"tickets\")]:::chg\n  P3 -->|\"calls listInbox\"| TS\n  TS -->|\"calls findInbox\"| TR\n  TR -->|\"SELECT\"| DB\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",
@@ -245,6 +252,7 @@
       },
       {
         "title": "Snoozed tickets come back by themselves",
+        "summary": "A timer brings due tickets back.",
         "why": "snooze is time based; without it snoozed tickets never come back",
         "needs": [
           1
@@ -253,6 +261,7 @@
         "flows": [
           {
             "title": "cron every 1 min",
+            "summary": "Every minute, wakes due tickets and tells browsers.",
             "why": "finds due tickets, unsnoozes them, tells open browsers",
             "diagram": {
               "mermaid": "flowchart LR\n  CR[\"SnoozeScheduler<br/>every minute, every instance\"]:::add\n  TS[\"TicketsService<br/>finds due, clears, notifies\"]:::chg\n  TR[\"TicketsRepository<br/>due query, bulk clear\"]:::chg\n  EG[\"EventsGateway<br/>sends to one tenant\"]:::same\n  IS[\"InboxStore<br/>moves ticket back to inbox\"]:::chg\n  DB[(\"tickets\")]:::chg\n  CR -->|\"calls wakeDue\"| TS\n  TS -->|\"findDue, clearSnooze\"| TR\n  TR -->|\"UPDATE where due\"| DB\n  TS -->|\"emits ticket.woke\"| EG\n  EG -->|\"WebSocket\"| IS\n  classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a\n  classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320\n  classDef same fill:#eef0f4,stroke:#9aa3b5,color:#3a4152",

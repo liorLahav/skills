@@ -21,6 +21,7 @@ export interface Diagram {
 /** Lowest level of the story. Files only appear as diagram nodes, labeled with their job in this flow. */
 export interface Flow {
   title: string;             // entry point: "PATCH /tickets/:id/snooze", "cron every 1 min", "Snooze button"
+  summary?: string;          // card line: what it does, under ~10 plain words
   why: string;               // which part of the step it delivers
   diagram?: Diagram;
   core: { ref: FileRef; explain: string }[];   // key code: 1-3 places the logic lives; panel shows the name + file/diff links, not the code
@@ -50,6 +51,7 @@ export interface Review {
     goal: string;
     steps: {
       title: string;         // one thing you could check by hand, no code names
+      summary?: string;      // card line: what it does, under ~10 plain words
       why: string;           // which ask it serves, or which later step needs it
       needs: number[];       // 1-based numbers of earlier steps it builds on
       asked: boolean;        // false = not in the intent

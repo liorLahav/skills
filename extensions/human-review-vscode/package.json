@@ -3,7 +3,7 @@
   "displayName": "Human Review",
   "description": "Renders the human-review skill's .review/review.json as goal, steps and flows in columns, with decisions, checks, details and one-click file and diff links.",
   "publisher": "lior-lahav",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
