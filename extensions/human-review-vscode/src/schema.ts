@@ -23,9 +23,9 @@ export interface Flow {
   title: string;             // entry point: "PATCH /tickets/:id/snooze", "cron every 1 min", "Snooze button"
   why: string;               // which part of the step it delivers
   diagram?: Diagram;
-  core: { ref: FileRef; explain: string }[];                    // 2-3 snippets, 5-15 lines; panel reads them from the file
-  decisions: { chose: string; instead: string; ref?: FileRef }[]; // choices the intent did not ask for
-  patterns: { did: string; repoUses: string; ref?: FileRef }[];   // new way where the repo already has one
+  core: { ref: FileRef; explain: string }[];   // key code: 1-3 places the logic lives; panel shows the name + file/diff links, not the code
+  decisions: { chose: string; instead: string; why?: string; ref?: FileRef }[];   // choices the intent did not ask for, incl. ignoring a repo pattern
+  patterns?: { did: string; repoUses: string; ref?: FileRef }[];   // older reviews only; shown as decisions
 }
 
 export interface Review {

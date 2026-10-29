@@ -1,12 +1,13 @@
 # Human Review
 
 Renders `.review/review.json` (written by the `human-review` Claude Code skill) as a review panel:
-start here, service map, story (goal -> steps -> flows, with why, core code, agent decisions), backend routes-to-DB flow, frontend UI and state, data models with a 4 word why per field, tests, open questions.
+three columns you click through: goal and steps | the open step and its flows | the open flow (why, diagram, key code links, decisions). Under the steps: Check (untested logic, decisions, questions) and Details (service map, backend, frontend, data models, files).
 
 - Every file has **file** (opens at the lines) and **diff** (native VS Code diff, merge base vs your working tree) links.
-- Left menu, one view at a time: Start here, Service map, Story (Goal + one view per step), each backend's Flow / walkthroughs / Side effects / Files, each frontend's UI / Functions / State / Imports / Files, each data model, Tests, Agent decisions, Open questions. `j` / `k` move next / previous; the panel remembers where you were.
+- Keys: ↑ ↓ within a column, → open the next column, ← or Esc back. Narrow tab: last 2 columns plus a breadcrumb. The panel remembers where you were.
+- Activity bar icon: sidebar with title, steps, files reviewed, questions; opening it opens the panel.
 - Every file node in a diagram shows its own **file** and **diff** links.
-- Tick files as reviewed; progress shows in the status bar, saved per branch.
+- Tick files as reviewed (Details → Files); progress shows in the header, sidebar and status bar, saved per branch.
 - Panel refreshes when the skill rewrites the JSON.
 
 Commands: `Human Review: Open`, `Human Review: Clear reviewed marks`.

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { Review, FileRef, validate } from './schema';
-import { renderHtml, snippetPaths } from './render';
+import { renderHtml } from './render';
 
 const REVIEW_GLOB = '.review/review.json';
 
@@ -13,11 +13,41 @@ interface GitAPI {
 let panel: vscode.WebviewPanel | undefined;
 let current: { review: Review; root: vscode.Uri } | undefined;
 let status: vscode.StatusBarItem;
+let summary: Summary;
+
+/** Activity bar sidebar: where the review stands, plus an Open button. Empty shows the welcome text from package.json. */
+class Summary implements vscode.TreeDataProvider<vscode.TreeItem> {
+  private changed = new vscode.EventEmitter<void>();
+  readonly onDidChangeTreeData = this.changed.event;
+  constructor(private ctx: vscode.ExtensionContext) {}
+  refresh() { this.changed.fire(); }
+  getTreeItem(i: vscode.TreeItem) { return i; }
+  getChildren(): vscode.TreeItem[] {
+    if (!current) return [];
+    const rv = current.review;
+    const item = (label: string, icon: string, description?: string, command?: vscode.Command) =>
+      Object.assign(new vscode.TreeItem(label), { iconPath: new vscode.ThemeIcon(icon), description, command, tooltip: description ? `${label} · ${description}` : label });
+    const done = this.ctx.workspaceState.get<string[]>(stateKey(rv), []).length;
+    return [
+      item(rv.title, 'git-pull-request', `${rv.head} → ${rv.base}`),
+      item(`${rv.story?.steps.length ?? 0} steps`, 'list-ordered'),
+      item(`${done}/${rv.files.length} files reviewed`, 'checklist'),
+      item(`${rv.questions.length} open questions`, 'question'),
+      item('Open review', 'preview', undefined, { command: 'humanReview.open', title: 'Open review' }),
+    ];
+  }
+}
 
 export function activate(ctx: vscode.ExtensionContext) {
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.command = 'humanReview.open';
   ctx.subscriptions.push(status);
+
+  summary = new Summary(ctx);
+  const view = vscode.window.createTreeView('humanReview.summary', { treeDataProvider: summary });
+  // Clicking the activity bar icon goes straight into the review.
+  view.onDidChangeVisibility(e => { if (e.visible && current) open(ctx); });
+  ctx.subscriptions.push(view);
 
   ctx.subscriptions.push(
     vscode.commands.registerCommand('humanReview.open', () => open(ctx)),
@@ -99,18 +129,12 @@ async function open(ctx: vscode.ExtensionContext) {
   render(ctx);
 }
 
-async function render(ctx: vscode.ExtensionContext) {
-  if (!panel || !current) return;
-  // Core snippets show the file as it is now, not a copy from when the review was written.
-  const lines: Record<string, string[]> = {};
-  for (const p of snippetPaths(current.review)) {
-    try { lines[p] = Buffer.from(await vscode.workspace.fs.readFile(fileUri(p))).toString('utf8').split(/\r?\n/); } catch { /* deleted or moved: panel says file not found */ }
-  }
+function render(ctx: vscode.ExtensionContext) {
   if (!panel || !current) return;
   const nonce = crypto.randomBytes(16).toString('base64');
   const mermaidUri = panel.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, 'media', 'mermaid.min.js')).toString();
   panel.title = `Review: ${current.review.title}`;
-  panel.webview.html = renderHtml(current.review, { cspSource: panel.webview.cspSource, nonce, mermaidUri, lines });
+  panel.webview.html = renderHtml(current.review, { cspSource: panel.webview.cspSource, nonce, mermaidUri });
 }
 
 async function onMessage(ctx: vscode.ExtensionContext, m: any) {
@@ -139,6 +163,7 @@ function sendReviewed(ctx: vscode.ExtensionContext) {
 }
 
 function updateStatus(ctx: vscode.ExtensionContext) {
+  summary.refresh();
   if (!current) { status.hide(); return; }
   const done = ctx.workspaceState.get<string[]>(stateKey(current.review), []).length;
   status.text = `$(checklist) Review ${done}/${current.review.files.length}`;

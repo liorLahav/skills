@@ -5,23 +5,21 @@ My Claude Code skills, plus the tools that go with them.
 | Path | What |
 |---|---|
 | `skills/human-review/` | Claude Code skill. Explains a branch or PR so a human can review agent-written code fast. Writes `.review/review.json`. |
-| `extensions/human-review-vscode/` | VS Code extension. Renders `review.json` with a menu, diagrams, and one-click file and diff links. |
+| `extensions/human-review-vscode/` | VS Code extension. Renders `review.json` as clickable columns (goal, step, flow), with diagrams and one-click file and diff links. Activity bar icon included. |
 
 ## human-review
 
-What you get for a change:
+What you get for a change, in three columns you click through, from high level to low level:
 
-- **Start here**: what, why, does it match the intent, which steps to read first
-- **Service map**: changed services and how they relate
-- **Story**: high level to low level, like a PR stack. Goal, then steps in build order (each one thing you could check by hand, with why it exists and which steps it builds on), then flows. Each flow: why, a diagram where every file shows its job in this flow, the 2 to 3 core code snippets with plain explanations, and the choices the agent made that you did not ask for
-- **Backend flow**: the full picture, routes on the left, DB on the right, every arrow labeled with why one file imports another
-- **Walkthroughs**: sequence diagram per route and background job, with error paths
-- **Side effects**: every DB write, cache change, event, outbound call
-- **Frontend**: UI changes, functions, state flow, imports
-- **Data models**: every field with a 4 word reason it exists; `no usage found` is flagged
-- **Tests**: which changed logic has a test and which does not
-- **Agent decisions**: every choice you did not ask for, and every place it ignored a pattern the repo already has
-- **Open questions**: what is unclear
+1. **Goal**: the outcome the change is for, whether it matches what you asked, and the steps in build order, like a PR stack.
+2. **Step**: one thing you could check by hand in the app, why it exists, and which steps it builds on. Its flows are listed below it.
+3. **Flow**: why it exists, a diagram where every file shows its job, the key code as file links with a one-line explanation, and the **decisions** the agent made that you did not ask for (chose / instead / why).
+
+Under the steps:
+- **Check**: untested logic, every decision, open questions. Each item opens its flow.
+- **Details**: service map, full backend flow with sequence diagrams and side effects, frontend UI and state, data models with a reason per field, files.
+
+All text is short and plain. Terms are in [GLOSSARY.md](GLOSSARY.md).
 
 Every file in tables and diagram nodes has **file** (opens at the lines) and **diff** (VS Code diff, merge base vs your working tree) links. Tick files as reviewed; progress is saved per branch.
 
@@ -57,12 +55,12 @@ Restart VS Code after install. On Windows, if `code` is not found: in VS Code ru
 1. Check out the branch you want to review.
 2. In Claude Code: `run human-review on this branch` (base defaults to `main`; say `against develop` to change it).
 3. The skill writes `.review/review.json` and adds `.review/` to `.gitignore`.
-4. In VS Code: click **Review 0/N** in the status bar, or run `Human Review: Open`.
-5. Use the left menu, or `j` / `k` to go to the next / previous view. Re-running the skill refreshes the panel.
+4. In VS Code: click the **Human Review** icon in the activity bar, **Review 0/N** in the status bar, or run `Human Review: Open`.
+5. Click a step, then a flow. Keys: ↑ ↓ move within a column, → opens the next column, ← or Esc goes back. On a narrow tab only the last 2 columns show, with a breadcrumb. Re-running the skill refreshes the panel.
 
 Commands: `Human Review: Open`, `Human Review: Clear reviewed marks`.
 
-Try it without a real change: open `extensions/human-review-vscode/sample/` as a workspace folder (it contains a sample `.review/review.json`). Links will not resolve since the sample files are not there, but the menu and diagrams render.
+Try it without a real change: open `extensions/human-review-vscode/sample/` as a workspace folder (it contains a sample `.review/review.json`). Links will not resolve since the sample files are not there, but the columns and diagrams render.
 
 ### How it fits together
 

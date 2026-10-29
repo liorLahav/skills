@@ -1,9 +1,9 @@
 {
   "name": "human-review",
   "displayName": "Human Review",
-  "description": "Renders the human-review skill's .review/review.json: service map, backend flow, frontend state, data models, tests, open questions, with one-click file and diff links.",
+  "description": "Renders the human-review skill's .review/review.json as goal, steps and flows in columns, with decisions, checks, details and one-click file and diff links.",
   "publisher": "lior-lahav",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
@@ -19,6 +19,29 @@
     "vscode.git"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "humanReview",
+          "title": "Human Review",
+          "icon": "resources/review.svg"
+        }
+      ]
+    },
+    "views": {
+      "humanReview": [
+        {
+          "id": "humanReview.summary",
+          "name": "Review"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "humanReview.summary",
+        "contents": "No .review/review.json in this workspace yet.\nIn Claude Code, run: run human-review on this branch\n[Open review](command:humanReview.open)"
+      }
+    ],
     "commands": [
       {
         "command": "humanReview.open",

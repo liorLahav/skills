@@ -1,6 +1,6 @@
 ---
 name: human-review
-description: Build a visual review of a change so a human can understand it fast. Use when asked to review, explain, or walk through a diff, branch, or PR. Writes .review/review.json for the Human Review VS Code extension (story: goal -> steps in build order -> flows with why, core code and agent decisions; service map, backend routes to DB flow, frontend UI/state, data models with a short reason per field, open questions).
+description: Build a visual review of a change so a human can understand it fast. Use when asked to review, explain, or walk through a diff, branch, or PR. Writes .review/review.json for the Human Review VS Code extension (goal -> steps in build order -> flows, each with why, key code links and decisions; service map, backend routes to DB flow, frontend UI/state, data models with a short reason per field, open questions).
 ---
 
 # Human Review
@@ -9,7 +9,9 @@ Goal: make the human understand the change, not grade it. Assume an agent wrote 
 
 Output: `.review/review.json` in the repo root, matching the schema at the bottom. The Human Review VS Code extension renders it and turns every path into clickable file and diff links. Only build an HTML artifact instead if the user asks for one (e.g. reviewing on phone).
 
-Writing rule for every string: clarity over grammar. Fragments fine. Short labels. No filler.
+Writing rule for every string: short and plain. Everyday words a reviewer new to this code gets on first read. No code names inside an explanation (they go in titles and links). A term the reader would have to look up: say what it is, in a few words, the first time (`Clerk, the sign-in service`). No filler.
+- Bad: `onRequest after Clerk hook`. Good: `then checks the salesman role`.
+- Bad: `hookName onRequest | instead: preHandler; 400 before 401`. Good: chose `check sign-in as soon as a request arrives`, instead `Clerk's default, checks later`, why `else bad input answers before "not signed in"`.
 
 ## 1. Collect the change
 
@@ -55,13 +57,13 @@ Read the code. Never guess from file names.
   - `needs`: earlier step numbers it builds on. `asked`: false when the intent did not ask for it (`why`: `not asked: <likely reason>`, add a question).
 - `flows` per step: each entry point that delivers it: route (`PATCH /tickets/:id/snooze`), job (`cron every 1 min`), consumer, UI action (`Snooze button`), migration. The flow is the lowest level; files only appear inside its diagram.
   - `why`: which part of the step it delivers.
-  - `diagram`: flow diagram shape (below), only this flow's files, max ~12 nodes. Every file node label = name + its core job in THIS flow, max 6 words: `TS["TicketsService<br/>finds due, clears snooze, notifies"]`. Every arrow = why it calls the next. Fill `nodes` for every file node (the panel uses them to link steps that share a file).
-  - `core`: 2 to 3 snippets where the real logic of this flow lives, 5 to 15 lines each, exact `startLine`/`endLine`. `explain`: plain words, what the lines do and why that way: `finds tickets due now, clears snooze in one update, then one event per tenant`. The panel reads the lines from the file.
-  - `decisions`: choices the intent did not ask for. `chose`: `polls every minute`; `instead`: the alternative and the cost: `delayed queue job; poll is up to 1 min late, runs on every instance`. Defaults, limits, timing, concurrency, error handling, timezones.
-  - `patterns`: where the agent wrote a new way and the repo already has one. Grep before claiming. `did`: `own date parsing`; `repoUses`: `date-fns, see apps/web/src/utils/date.ts`.
+  - `diagram`: flow diagram shape (below), only this flow's files, max ~12 nodes. Every file node label = name + its job in THIS flow in plain words, max 6: `TS["TicketsService<br/>finds due, clears snooze, notifies"]`. Every arrow = what happens next, plain, max 6 words: `then checks the role`, not a hook or function name. Fill `nodes` for every file node (the panel uses them to link steps that share a file).
+  - `core` (shown as Key code): 1 to 3 places where the real logic of this flow lives, as `ref` with exact `startLine`/`endLine`. The panel shows only the file name and lines with file/diff links, not the code. `explain`: one short plain line, what happens there: `finds due tickets, clears them in one update`.
+  - `decisions`: choices the intent did not ask for: defaults, limits, timing, concurrency, error handling, timezones. Also where the agent wrote its own way and the repo already has one (grep before claiming). Three short plain parts, max ~10 words each: `chose` `polls every minute`; `instead` `a delayed job per ticket`; `why` `simpler, but up to 1 min late`. Pattern break: `chose` `own date math`; `instead` `the repo's date-fns helpers`; `why` (the agent's likely reason, or `no reason found`). `ref` where it happens.
 - Every changed `logic`/`types` file must be a node in at least one flow. A file that fits no step is a missing step (often `asked: false`).
 
 **Flow diagram shape**: `flowchart LR`, one `subgraph` per column, strict outside to inside: `Routes / triggers` (routes as `METHOD /path`, cron, queue consumers) -> `Guards / pipes` -> `Services` -> `Repos / models` -> `Data / outside` (tables, Redis keys, queues, WebSocket, external APIs). Arrow = importer -> imported, labeled WHY. Frontend flows: `UI action -> component -> store/service -> API call`.
+Columns only fit a flow that enters at a route/trigger and ends at data. Prompt, docs or config changes, or a flow that starts outside (an external system's event or failure, `calendar read failed`): no column subgraphs; draw what happens in order, left to right, first event leftmost. Never let arrows run right to left; if they would, the columns are wrong for this flow.
 
 **backend** (one per backend service, reference for the whole picture)
 - `flow`: the full diagram of all changed routes to data, flow diagram shape.
@@ -81,6 +83,7 @@ Read the code. Never guess from file names.
 ## 5. Diagram rules
 
 - Every arrow labeled. Mermaid ids: letters/digits only.
+- Arrows point the way things happen: first thing left (or top). Read each diagram's source once, first node to last, before writing it; a valid JSON is not a readable diagram.
 - Changed/added/unchanged via classDefs, always include these three:
   `classDef chg fill:#dbe4ff,stroke:#2b59c3,color:#10204a`
   `classDef add fill:#d9f2e3,stroke:#1f7a46,color:#0f3320`
@@ -91,7 +94,7 @@ Read the code. Never guess from file names.
 ## 6. Finish
 
 - Write `.review/review.json`. Make sure `.review/` is in `.gitignore` (add it if missing).
-- Validate: parse the JSON, check every `path` exists in the repo (or is a deleted file), every model field has a `why`, every `core` snippet has `startLine`/`endLine` that show the logic it explains, `needs` only point to earlier steps, every changed logic/types file is a node in some flow.
+- Validate: parse the JSON, check every `path` exists in the repo (or is a deleted file), every model field has a `why`, every `core` ref has `startLine`/`endLine` that cover the logic it explains, every decision has `chose`, `instead` and `why`, `needs` only point to earlier steps, every changed logic/types file is a node in some flow.
 - Reply with one line: what the change is, plus "open Human Review in VS Code".
 
 ## Rules
@@ -108,9 +111,8 @@ interface FileRef { path: string; startLine?: number; endLine?: number }   // re
 interface Diagram { mermaid: string; nodes?: Record<string, FileRef> }
 interface Flow {
   title: string; why: string; diagram?: Diagram;
-  core: { ref: FileRef; explain: string }[];
-  decisions: { chose: string; instead: string; ref?: FileRef }[];
-  patterns: { did: string; repoUses: string; ref?: FileRef }[];
+  core: { ref: FileRef; explain: string }[];   // key code: refs only
+  decisions: { chose: string; instead: string; why: string; ref?: FileRef }[];   // includes pattern breaks
 }
 
 interface Review {

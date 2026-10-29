@@ -73,13 +73,14 @@
                   "startLine": 8,
                   "endLine": 16
                 },
-                "explain": "adds snoozedUntil, snoozeNote, snoozeCount as nullable, so no table rewrite and old rows read as not snoozed"
+                "explain": "adds snoozedUntil, snoozeNote, snoozeCount as nullable"
               }
             ],
             "decisions": [
               {
                 "chose": "no index on snoozedUntil",
-                "instead": "partial index WHERE snoozedUntil IS NOT NULL; without it the wake query scans tickets every minute",
+                "instead": "a partial index on snoozedUntil",
+                "why": "simpler, but the wake query scans the table every minute",
                 "ref": {
                   "path": "apps/api/migrations/1729900000000-add-ticket-snooze.ts",
                   "startLine": 8,
@@ -88,15 +89,15 @@
               },
               {
                 "chose": "adds snoozeCount column",
-                "instead": "leave it out; not asked and nothing reads it yet",
+                "instead": "leave it out",
+                "why": "not asked and nothing reads it yet",
                 "ref": {
                   "path": "apps/api/src/tickets/ticket.entity.ts",
                   "startLine": 40,
                   "endLine": 42
                 }
               }
-            ],
-            "patterns": []
+            ]
           }
         ]
       },
@@ -136,21 +137,21 @@
                   "startLine": 30,
                   "endLine": 38
                 },
-                "explain": "404 if no ticket in this tenant, 409 if closed or already snoozed, then saves the time and drops the inbox cache"
+                "explain": "404 if no ticket in this tenant, 409 if closed or already snoozed"
               }
             ],
             "decisions": [
               {
                 "chose": "409 when already snoozed",
-                "instead": "just move the time; agents must unsnooze first to change it",
+                "instead": "just move the snooze time",
+                "why": "agent must unsnooze first to change it",
                 "ref": {
                   "path": "apps/api/src/tickets/tickets.service.ts",
                   "startLine": 33,
                   "endLine": 34
                 }
               }
-            ],
-            "patterns": []
+            ]
           },
           {
             "title": "Snooze button",
@@ -179,18 +180,18 @@
             "decisions": [
               {
                 "chose": "optional note on snooze",
-                "instead": "no note; not asked",
+                "instead": "no note",
+                "why": "not asked; agent added it",
                 "ref": {
                   "path": "apps/web/src/app/tickets/snooze-menu/snooze-menu.component.ts",
                   "startLine": 32,
                   "endLine": 36
                 }
-              }
-            ],
-            "patterns": [
+              },
               {
-                "did": "own preset to date math",
-                "repoUses": "date-fns helpers in apps/web/src/app/shared/date.ts",
+                "chose": "own preset to date math",
+                "instead": "the repo date helpers in apps/web/src/app/shared/date.ts",
+                "why": "no reason found",
                 "ref": {
                   "path": "apps/web/src/app/tickets/snooze-menu/snooze-menu.component.ts",
                   "startLine": 18,
@@ -238,8 +239,7 @@
                 "explain": "default hides rows with snoozedUntil set; ?snoozed=true returns only those"
               }
             ],
-            "decisions": [],
-            "patterns": []
+            "decisions": []
           }
         ]
       },
@@ -278,7 +278,7 @@
                   "startLine": 52,
                   "endLine": 60
                 },
-                "explain": "one query for due tickets, one bulk update to clear them, then one ticket.woke per tenant"
+                "explain": "one query for due tickets, one bulk update to clear them"
               },
               {
                 "ref": {
@@ -292,15 +292,15 @@
             "decisions": [
               {
                 "chose": "polls every minute",
-                "instead": "delayed queue job per ticket; polling is up to 1 min late and runs on every instance",
+                "instead": "a delayed job per ticket",
+                "why": "simpler, but up to 1 min late and runs on every instance",
                 "ref": {
                   "path": "apps/api/src/tickets/snooze.scheduler.ts",
                   "startLine": 1,
                   "endLine": 20
                 }
               }
-            ],
-            "patterns": []
+            ]
           }
         ]
       }
